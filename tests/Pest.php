@@ -47,6 +47,9 @@ expect()->extend('toBeSchedulable', function () {
 |
 */
 
+/**
+ * @return \Illuminate\Database\Eloquent\Model&\Zap\Models\Concerns\HasSchedules
+ */
 function createUser()
 {
     static $instance = null;
@@ -63,6 +66,11 @@ function createUser()
             public function getKey()
             {
                 return 1; // Mock user ID
+            }
+
+            public function getMorphClass()
+            {
+                return $this->table;
             }
         };
     }
@@ -86,6 +94,11 @@ function createRoom()
             public function getKey()
             {
                 return 1; // Mock room ID
+            }
+
+            public function getMorphClass()
+            {
+                return $this->table;
             }
         };
     }

@@ -2,6 +2,8 @@
 
 namespace Zap\Models\Concerns;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Zap\Builders\ScheduleBuilder;
 use Zap\Enums\ScheduleTypes;
@@ -138,11 +140,11 @@ trait HasSchedules
     public function isAvailableAt(string $date, string $startTime, string $endTime): bool
     {
         // Get all active schedules for this model on this date
-        $schedules = \Zap\Models\Schedule::where('schedulable_type', get_class($this))
+        /** @var Collection<int, Schedule> $schedules */
+        $schedules = \Zap\Models\Schedule::where('schedulable_type', $this->getMorphClass())
             ->where('schedulable_id', $this->getKey())
             ->active()
             ->forDate($date)
-            ->with('periods')
             ->get();
 
         foreach ($schedules as $schedule) {
@@ -169,23 +171,31 @@ trait HasSchedules
 
         $bufferMinutes = (int) config('zap.conflict_detection.buffer_minutes', 0);
 
-        if ($schedule->is_recurring) {
-            return $this->recurringScheduleBlocksTime($schedule, $date, $startTime, $endTime, $bufferMinutes);
-        }
+        //if ($schedule->is_recurring) {
+        //    return $this->recurringScheduleBlocksTime($schedule, $date, $startTime, $endTime, $bufferMinutes);
+        //}
 
         // For non-recurring schedules: if no buffer, keep using the optimized overlapping scope
         if ($bufferMinutes <= 0) {
-            return $schedule->periods()->overlapping($date, $startTime, $endTime, $schedule->end_date ?? null)->exists();
+            $startA = $schedule->start_date->clone()->setTimeFromTimeString($schedule->start_time);
+            $endA = $schedule->end_date ? $schedule->end_date->clone() : $startA->clone();
+            $endA->setTimeFromTimeString($schedule->end_time);
+
+            $startB = Carbon::createFromFormat('Y-m-d H:i', "$date $startTime");
+            $endB = Carbon::createFromFormat('Y-m-d H:i', "$date $endTime");
+
+            return $startA->lt($endB) && $endA->gt($startB);
+            //return $schedule->periods()->overlapping($date, $startTime, $endTime, $schedule->end_date ?? null)->exists();
         }
 
         // With buffer, we need to evaluate in PHP
-        $periods = $schedule->periods()->forDate($date)->get();
-
-        foreach ($periods as $period) {
-            if ($this->timePeriodsOverlapWithBuffer($period->start_time, $period->end_time, $startTime, $endTime, $bufferMinutes)) {
-                return true;
-            }
-        }
+        //$periods = $schedule->periods()->forDate($date)->get();
+        //
+        //foreach ($periods as $period) {
+        //    if ($this->timePeriodsOverlapWithBuffer($period->start_time, $period->end_time, $startTime, $endTime, $bufferMinutes)) {
+        //        return true;
+        //    }
+        //}
 
         return false;
     }

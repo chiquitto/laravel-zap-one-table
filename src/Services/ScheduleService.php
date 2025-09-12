@@ -3,10 +3,9 @@
 namespace Zap\Services;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 use Zap\Builders\ScheduleBuilder;
-use Zap\Events\ScheduleCreated;
 use Zap\Exceptions\ScheduleConflictException;
 use Zap\Models\Schedule;
 
@@ -19,13 +18,15 @@ class ScheduleService
 
     /**
      * Create a new schedule with validation and conflict detection.
+     *
+     * @return Collection<int, Schedule>
      */
     public function create(
         Model $schedulable,
         array $attributes,
         array $periods = [],
         array $rules = []
-    ): Schedule {
+    ): Collection {
         return DB::transaction(function () use ($schedulable, $attributes, $periods, $rules) {
             // Set default values
             $attributes = array_merge([
@@ -36,28 +37,127 @@ class ScheduleService
             // Validate the schedule data
             $this->validator->validate($schedulable, $attributes, $periods, $rules);
 
-            // Create the schedule
-            $schedule = new Schedule($attributes);
-            $schedule->schedulable_type = get_class($schedulable);
-            $schedule->schedulable_id = $schedulable->getKey();
-            $schedule->save();
+            $startDate = \Carbon\Carbon::parse($attributes['start_date']);
 
-            // Create periods if provided
-            if (! empty($periods)) {
-                foreach ($periods as $period) {
-                    $period['schedule_id'] = $schedule->id;
-                    $schedule->periods()->create($period);
+            if ($attributes['is_recurring']) {
+                // fix the start_date to the first occurrence based on frequency
+                if (!$this->isCorrectDate(
+                    $attributes['frequency'],
+                    $attributes['frequency_config'],
+                    $startDate
+                )) {
+                    $startDate = $this->getNextDate(
+                        $attributes['frequency'],
+                        $attributes['frequency_config'],
+                        $startDate
+                    );
+                    $attributes['frequency_config']['start_date'] = $attributes['start_date'];
+                    $attributes['frequency_config']['end_date'] = $attributes['end_date'];
                 }
             }
+
+            $current = $startDate->copy();
+            $end = $attributes['is_recurring'] ? \Carbon\Carbon::parse($attributes['end_date']) : $current->copy();
+
+            // Create the schedules
+            $schedules = collect([]);
+            $recurringIds = [];
+            do {
+                foreach ($periods as $k => $period) {
+                    $data = array_merge($attributes, [
+                        'start_date' => $current->toDateString(),
+                        'end_date' => null,
+                        'start_time' => $period['start_time'],
+                        'end_time' => $period['end_time'],
+                        'recurring_id' => $recurringIds[$k] ?? null,
+                    ]);
+
+                    if (isset($recurringIds[$k])) {
+                        $data['frequency'] = null;
+                        $data['frequency_config'] = null;
+                    }
+
+                    $schedule = new Schedule($data);
+                    $schedule->schedulable_type = $schedulable->getMorphClass();
+                    $schedule->schedulable_id = $schedulable->getKey();
+                    $schedule->save();
+
+                    if (!isset($recurringIds[$k])) {
+                        $recurringIds[$k] = $schedule->getKey();
+                    }
+
+                    $schedules->push($schedule);
+                }
+
+                if (!$attributes['is_recurring']) {
+                    break;
+                }
+
+                $current = $this->getNextDate(
+                    $attributes['frequency'],
+                    $attributes['frequency_config'],
+                    $current
+                );
+            } while ($current->lessThanOrEqualTo($end));
 
             // Note: Conflict checking is now done during validation phase
             // No need to check again after creation
 
             // Fire the created event
-            Event::dispatch(new ScheduleCreated($schedule));
+            // Event::dispatch(new ScheduleCreated($schedule));
 
-            return $schedule->load('periods');
+            return $schedules;
         });
+    }
+
+    private function isCorrectDate($frequency, $config, \Carbon\Carbon $date): bool
+    {
+        switch ($frequency) {
+            case 'daily':
+                return true;
+
+            case 'weekly':
+                $allowedDays = $config['days'] ?? [];
+
+                return empty($allowedDays) || in_array(strtolower($date->format('l')), $allowedDays);
+
+            case 'monthly':
+                $dayOfMonth = $config['day_of_month'] ?? $date->day;
+
+                return $date->day === $dayOfMonth;
+
+            default:
+                return false;
+        }
+    }
+
+    private function getNextDate($frequency, $config, \Carbon\Carbon $current): \Carbon\Carbon
+    {
+        $current = $current->copy();
+
+        switch ($frequency) {
+            case 'daily':
+                return $current->addDay();
+
+            case 'weekly':
+                $allowedDays = $config['days'] ?? [];
+                do {
+                    $current->addDay();
+                } while (! empty($allowedDays) && ! in_array(strtolower($current->format('l')), $allowedDays));
+
+                return $current;
+
+            case 'monthly':
+                $dayOfMonth = $config['day_of_month'] ?? $current->day;
+                do {
+                    $current->addDay();
+                } while ($current->day !== $dayOfMonth);
+
+                return $current;
+
+            default:
+                return $current->addDay();
+        }
     }
 
     /**

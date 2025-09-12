@@ -163,12 +163,12 @@ class ConflictDetectionService
      * Check if two specific periods overlap.
      */
     protected function periodPairOverlaps(
-        SchedulePeriod $period1,
-        SchedulePeriod $period2,
+        Schedule $period1,
+        Schedule $period2,
         int $bufferMinutes = 0
     ): bool {
         // Must be on the same date
-        if (! $period1->date->eq($period2->date)) {
+        if (! $period1->start_date->eq($period2->start_date)) {
             return false;
         }
 
@@ -191,14 +191,16 @@ class ConflictDetectionService
      */
     protected function getSchedulePeriods(Schedule $schedule): Collection
     {
-        $periods = $schedule->relationLoaded('periods')
-            ? $schedule->periods
-            : $schedule->periods()->get();
+        // $periods = $schedule->relationLoaded('periods')
+        //     ? $schedule->periods
+        //     : $schedule->periods()->get();
+        //
+        // // If this is a recurring schedule, we need to generate recurring instances
+        // if ($schedule->is_recurring) {
+        //     return $this->generateRecurringPeriods($schedule, $periods);
+        // }
 
-        // If this is a recurring schedule, we need to generate recurring instances
-        if ($schedule->is_recurring) {
-            return $this->generateRecurringPeriods($schedule, $periods);
-        }
+        $periods = collect([$schedule]);
 
         return $periods;
     }
@@ -363,7 +365,6 @@ class ConflictDetectionService
             ->where('schedulable_id', $schedule->schedulable_id)
             ->where('id', '!=', $schedule->id)
             ->active()
-            ->with('periods')
             ->get();
     }
 

@@ -4,6 +4,7 @@ namespace Zap\Builders;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Zap\Enums\ScheduleTypes;
 use Zap\Models\Schedule;
 use Zap\Services\ScheduleService;
@@ -320,9 +321,11 @@ class ScheduleBuilder
     }
 
     /**
-     * Save the schedule.
+     * Save the schedules.
+     *
+     * @return Collection<int, Schedule>
      */
-    public function save(): Schedule
+    public function save(): Collection
     {
         $built = $this->build();
 

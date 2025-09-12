@@ -19,6 +19,8 @@ use Zap\Enums\ScheduleTypes;
  * @property ScheduleTypes $schedule_type
  * @property Carbon $start_date
  * @property Carbon|null $end_date
+ * @property Carbon $start_time
+ * @property Carbon $end_time
  * @property bool $is_recurring
  * @property string|null $frequency
  * @property array|null $frequency_config
@@ -27,7 +29,6 @@ use Zap\Enums\ScheduleTypes;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, SchedulePeriod> $periods
  * @property-read Model $schedulable
  * @property-read int $total_duration
  */
@@ -44,7 +45,10 @@ class Schedule extends Model
         'schedule_type',
         'start_date',
         'end_date',
+        'start_time',
+        'end_time',
         'is_recurring',
+        'recurring_id',
         'frequency',
         'frequency_config',
         'metadata',
@@ -75,16 +79,6 @@ class Schedule extends Model
     public function schedulable(): MorphTo
     {
         return $this->morphTo();
-    }
-
-    /**
-     * Get the schedule periods.
-     *
-     * @return HasMany<SchedulePeriod, $this>
-     */
-    public function periods(): HasMany
-    {
-        return $this->hasMany(SchedulePeriod::class);
     }
 
     /**
@@ -207,14 +201,6 @@ class Schedule extends Model
         }
 
         return false;
-    }
-
-    /**
-     * Get the total duration of all periods in minutes.
-     */
-    public function getTotalDurationAttribute(): int
-    {
-        return $this->periods->sum('duration_minutes');
     }
 
     /**

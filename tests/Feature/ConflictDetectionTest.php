@@ -63,8 +63,13 @@ describe('Conflict Detection', function () {
             ->addPeriod('11:00', '12:00') // No overlap with 09:00-10:00
             ->save();
 
-        expect($schedule1)->toBeInstanceOf(Schedule::class);
-        expect($schedule2)->toBeInstanceOf(Schedule::class);
+        expect($schedule1)->toBeInstanceOf(\Illuminate\Support\Collection::class);
+        expect($schedule1->count())->toBeOne();
+        expect($schedule1->first())->toBeInstanceOf(Schedule::class);
+
+        expect($schedule2)->toBeInstanceOf(\Illuminate\Support\Collection::class);
+        expect($schedule2->count())->toBeOne();
+        expect($schedule2->first())->toBeInstanceOf(Schedule::class);
     });
 
     it('allows overlapping periods on different dates', function () {
@@ -82,8 +87,13 @@ describe('Conflict Detection', function () {
             ->addPeriod('09:00', '11:00') // Same time, different date
             ->save();
 
-        expect($schedule1)->toBeInstanceOf(Schedule::class);
-        expect($schedule2)->toBeInstanceOf(Schedule::class);
+        expect($schedule1)->toBeInstanceOf(\Illuminate\Support\Collection::class);
+        expect($schedule1->count())->toBeOne();
+        expect($schedule1->first())->toBeInstanceOf(Schedule::class);
+
+        expect($schedule2)->toBeInstanceOf(\Illuminate\Support\Collection::class);
+        expect($schedule2->count())->toBeOne();
+        expect($schedule2->first())->toBeInstanceOf(Schedule::class);
     });
 
     it('detects conflicts with buffer time', function () {
@@ -127,21 +137,14 @@ describe('Conflict Detection', function () {
 
         // Create a new appointment schedule that overlaps with both
         $newSchedule = new Schedule([
-            'schedulable_type' => get_class($user),
+            'schedulable_type' => $user->getMorphClass(),
             'schedulable_id' => $user->getKey(),
             'start_date' => '2025-01-01',
+            'start_time' => '09:30', // Overlaps with Meeting 1 (09:00-10:00)
+            'end_time' => '11:00',   // Overlaps with Meeting 2 (10:30-11:30)
             'name' => 'Conflicting Meeting',
             'schedule_type' => ScheduleTypes::APPOINTMENT,
         ]);
-
-        // Add periods that overlap with both existing schedules
-        $newSchedule->setRelation('periods', collect([
-            new \Zap\Models\SchedulePeriod([
-                'date' => '2025-01-01',
-                'start_time' => '09:30', // Overlaps with Meeting 1 (09:00-10:00)
-                'end_time' => '11:00',   // Overlaps with Meeting 2 (10:30-11:30)
-            ]),
-        ]));
 
         $conflicts = Zap::findConflicts($newSchedule);
         expect($conflicts)->toHaveCount(2);
@@ -164,19 +167,22 @@ describe('Conflict Detection', function () {
             ->addPeriod('10:00', '12:00') // Would normally conflict
             ->save();
 
-        expect($schedule2)->toBeInstanceOf(Schedule::class);
+        expect($schedule2)->toBeInstanceOf(\Illuminate\Support\Collection::class);
+        expect($schedule2->count())->toBeOne();
+        expect($schedule2->first())->toBeInstanceOf(Schedule::class);
     });
 
     it('handles complex recurring schedule conflicts', function () {
         $user = createUser();
 
         // Create recurring schedule
-        Zap::for($user)
+        $schedule = Zap::for($user)
             ->named('Weekly Meeting')
             ->from('2025-01-01')
-            ->to('2025-12-31')
+            ->to('2025-01-15')
             ->addPeriod('09:00', '10:00')
-            ->weekly(['monday'])
+            ->addPeriod('13:00', '15:00')
+            ->weekly(['monday', 'friday']) // Every Monday and Fryday
             ->save();
 
         // Try to create conflicting one-time event
@@ -254,12 +260,13 @@ describe('Availability Checking', function () {
         $user = createUser();
 
         // Block entire first day
-        Zap::for($user)
+        $schedules = Zap::for($user)
             ->from('2025-01-01')
-            ->addPeriod('09:00', '17:00')
+            ->addPeriod('09:00', '12:00')
+            ->addPeriod('12:00', '17:00')
             ->save();
 
-        $nextSlot = $user->getNextAvailableSlot('2025-01-01', 60, '09:00', '17:00');
+        $nextSlot = $user->getNextAvailableSlot('2025-01-01', 75, '09:00', '17:00');
 
         expect($nextSlot)->toBeArray();
         expect($nextSlot['date'])->toBe('2025-01-02'); // Should find slot on next day

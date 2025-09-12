@@ -3,6 +3,7 @@
 namespace Zap\Services;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Zap\Exceptions\InvalidScheduleException;
 
 class ValidationService
@@ -536,30 +537,27 @@ class ValidationService
         }
 
         // Create a temporary schedule for conflict checking
-        $tempSchedule = new \Zap\Models\Schedule([
-            'schedulable_type' => get_class($schedulable),
-            'schedulable_id' => $schedulable->getKey(),
-            'start_date' => $attributes['start_date'],
-            'end_date' => $attributes['end_date'] ?? null,
-            'is_active' => true,
-            'is_recurring' => $attributes['is_recurring'] ?? false,
-            'frequency' => $attributes['frequency'] ?? null,
-            'frequency_config' => $attributes['frequency_config'] ?? null,
-            'schedule_type' => $attributes['schedule_type'] ?? \Zap\Enums\ScheduleTypes::CUSTOM,
-        ]);
+        $isRecurring = $attributes['is_recurring'] ?? false;
+        $recurringId = $isRecurring ? (string) Str::uuid7() : null;
 
-        // Create temporary periods
         $tempPeriods = collect();
         foreach ($periods as $period) {
-            $tempPeriods->push(new \Zap\Models\SchedulePeriod([
-                'date' => $period['date'] ?? $attributes['start_date'],
+            $tempSchedule = new \Zap\Models\Schedule([
+                'schedulable_type' => $schedulable->getMorphClass(),
+                'schedulable_id' => $schedulable->getKey(),
+                'start_date' => $attributes['start_date'],
+                'end_date' => $attributes['end_date'] ?? null,
                 'start_time' => $period['start_time'],
                 'end_time' => $period['end_time'],
-                'is_available' => $period['is_available'] ?? true,
-                'metadata' => $period['metadata'] ?? null,
-            ]));
+                'is_active' => true,
+                'is_recurring' => $isRecurring,
+                'recurring_id' => $recurringId,
+                'frequency' => $attributes['frequency'] ?? null,
+                'frequency_config' => $attributes['frequency_config'] ?? null,
+                'schedule_type' => $attributes['schedule_type'] ?? \Zap\Enums\ScheduleTypes::CUSTOM,
+            ]);
+            $tempPeriods->push($tempSchedule);
         }
-        $tempSchedule->setRelation('periods', $tempPeriods);
 
         // For custom schedules with noOverlap rule, check conflicts with all other schedules
         if ($tempSchedule->schedule_type->is(\Zap\Enums\ScheduleTypes::CUSTOM)) {
@@ -595,7 +593,6 @@ class ValidationService
             ->where('schedulable_id', $schedule->schedulable_id)
             ->where('id', '!=', $schedule->id)
             ->active()
-            ->with('periods')
             ->get();
 
         $conflictService = app(\Zap\Services\ConflictDetectionService::class);
