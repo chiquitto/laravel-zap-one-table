@@ -66,8 +66,9 @@ describe('Original Issues Fixed', function () {
             ->noOverlap()
             ->save();
 
-        expect($schedule)->toBeInstanceOf(Schedule::class);
-        expect($schedule->name)->toBe('Sunday Meeting');
+        expect($schedule)->toBeInstanceOf(\Illuminate\Support\Collection::class);
+        expect($schedule->first())->toBeInstanceOf(Schedule::class);
+        expect($schedule->first()->name)->toBe('Sunday Meeting');
     });
 
     it('demonstrates the fix works across multiple weeks', function () {
@@ -98,7 +99,8 @@ describe('Original Issues Fixed', function () {
             ->noOverlap()
             ->save();
 
-        expect($tuesdaySchedule)->toBeInstanceOf(Schedule::class);
+        expect($tuesdaySchedule)->toBeInstanceOf(\Illuminate\Support\Collection::class);
+        expect($tuesdaySchedule->first())->toBeInstanceOf(Schedule::class);
 
         // Should conflict on Wednesday in week 3
         expect(function () use ($user) {
@@ -116,7 +118,8 @@ describe('Original Issues Fixed', function () {
             ->noOverlap()
             ->save();
 
-        expect($thursdaySchedule)->toBeInstanceOf(Schedule::class);
+        expect($thursdaySchedule)->toBeInstanceOf(\Illuminate\Support\Collection::class);
+        expect($thursdaySchedule->first())->toBeInstanceOf(Schedule::class);
 
         // Should conflict on Friday in week 3
         expect(function () use ($user) {

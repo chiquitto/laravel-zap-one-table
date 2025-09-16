@@ -126,6 +126,7 @@ class ScheduleBuilder
     {
         $this->attributes['is_recurring'] = true;
         $this->attributes['frequency'] = 'daily';
+        $this->attributes['frequency_config'] = [];
 
         return $this;
     }

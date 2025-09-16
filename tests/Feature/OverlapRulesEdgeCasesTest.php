@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Collection;
 use Zap\Exceptions\ScheduleConflictException;
 use Zap\Facades\Zap;
 use Zap\Models\Schedule;
@@ -66,8 +67,9 @@ describe('Overlap Rules Edge Cases', function () {
                 ->noOverlap()
                 ->save();
 
-            expect($schedule)->toBeInstanceOf(Schedule::class);
-            expect($schedule->name)->toBe('Sunday Schedule');
+            expect($schedule)->toBeInstanceOf(Collection::class);
+            expect($schedule->first())->toBeInstanceOf(Schedule::class);
+            expect($schedule->first()->name)->toBe('Sunday Schedule');
         });
 
         it('should handle multiple period conflicts correctly', function () {
@@ -108,7 +110,8 @@ describe('Overlap Rules Edge Cases', function () {
                 ->noOverlap()
                 ->save();
 
-            expect($lunchSchedule)->toBeInstanceOf(Schedule::class);
+            expect($lunchSchedule)->toBeInstanceOf(Collection::class);
+            expect($lunchSchedule->first())->toBeInstanceOf(Schedule::class);
         });
 
         it('should correctly identify conflicts across different weeks', function () {
@@ -139,7 +142,8 @@ describe('Overlap Rules Edge Cases', function () {
                 ->noOverlap()
                 ->save();
 
-            expect($wednesdaySchedule)->toBeInstanceOf(Schedule::class);
+            expect($wednesdaySchedule)->toBeInstanceOf(Collection::class);
+            expect($wednesdaySchedule->first())->toBeInstanceOf(Schedule::class);
         });
 
     });
@@ -187,7 +191,8 @@ describe('Overlap Rules Edge Cases', function () {
                 ->noOverlap()
                 ->save();
 
-            expect($weekendSchedule)->toBeInstanceOf(Schedule::class);
+            expect($weekendSchedule)->toBeInstanceOf(Collection::class);
+            expect($weekendSchedule->first())->toBeInstanceOf(Schedule::class);
 
             // Try to schedule on a weekday - should conflict
             expect(function () use ($user) {
@@ -231,7 +236,8 @@ describe('Overlap Rules Edge Cases', function () {
                 ->noOverlap()
                 ->save();
 
-            expect($nextDaySchedule)->toBeInstanceOf(Schedule::class);
+            expect($nextDaySchedule)->toBeInstanceOf(Collection::class);
+            expect($nextDaySchedule->first())->toBeInstanceOf(Schedule::class);
         });
 
     });
@@ -282,7 +288,8 @@ describe('Overlap Rules Edge Cases', function () {
                 ->noOverlap()
                 ->save();
 
-            expect($februarySchedule)->toBeInstanceOf(Schedule::class);
+            expect($februarySchedule)->toBeInstanceOf(Collection::class);
+            expect($februarySchedule->first())->toBeInstanceOf(Schedule::class);
 
             // Try to schedule on a Monday in January - should conflict
             expect(function () use ($user) {
@@ -314,7 +321,8 @@ describe('Overlap Rules Edge Cases', function () {
                 ->noOverlap()
                 ->save();
 
-            expect($afternoonSchedule)->toBeInstanceOf(Schedule::class);
+            expect($afternoonSchedule)->toBeInstanceOf(Collection::class);
+            expect($afternoonSchedule->first())->toBeInstanceOf(Schedule::class);
 
             // Overlapping by one minute should fail
             expect(function () use ($user) {
@@ -342,7 +350,8 @@ describe('Overlap Rules Edge Cases', function () {
                 ->noOverlap()
                 ->save();
 
-            expect($morningSchedule)->toBeInstanceOf(Schedule::class);
+            expect($morningSchedule)->toBeInstanceOf(Collection::class);
+            expect($morningSchedule->first())->toBeInstanceOf(Schedule::class);
         });
 
     });
